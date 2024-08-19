@@ -10,6 +10,7 @@ use tracing_actix_web::TracingLogger;
 
 pub mod routes;
 pub mod types;
+pub mod model;
 
 #[derive(Clone)]
 struct AppState {
@@ -38,7 +39,6 @@ impl AppEnv {
 
 #[shuttle_runtime::main]
 async fn actix_web(
-    #[shuttle_shared_db::Postgres] pool: PgPool,
     #[shuttle_runtime::Secrets] secret_store: SecretStore,
 ) -> ShuttleActixWeb<impl FnOnce(&mut ServiceConfig) + Send + Clone + 'static> {
     let app_env = AppEnv::new(&secret_store)?;
@@ -47,6 +47,9 @@ async fn actix_web(
         .with_api_key(api_key);
 
     let client = Client::with_config(config);
+    let pool = PgPool::connect(&app_env.database_url)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to connect to the database: {}", e))?;
     let app_state = web::Data::new(AppState { pool, openai_client: client });
 
     let config = move |cfg: &mut ServiceConfig| {
