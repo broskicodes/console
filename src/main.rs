@@ -11,6 +11,7 @@ use tracing_actix_web::TracingLogger;
 pub mod routes;
 pub mod types;
 pub mod model;
+pub mod utils;
 
 #[derive(Clone)]
 struct AppState {

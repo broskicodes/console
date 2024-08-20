@@ -2,7 +2,7 @@ use actix_web::{post, web, Error};
 use async_openai::types::{ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageContent, ChatCompletionResponseMessage, CreateChatCompletionRequestArgs};
 // use tracing::info;
 
-use crate::{model::{chat::Chat, message::Message}, types::ai::SendMessageRequest, AppState};
+use crate::{model::{chat::Chat, message::Message}, types::ai::SendMessageRequest, utils::insert_message, AppState};
 
 #[post("/send-message")]
 async fn send_message(
@@ -53,7 +53,7 @@ async fn send_message(
                 _ => return Err(Error::from(actix_web::error::ErrorInternalServerError(String::from("Last message must be a user message")))),
             };
             
-            Message::new(&app_state.pool, chat_id.clone(), role, content)
+            insert_message(&app_state.pool, &app_state.openai_client, chat_id.clone(), role, content)
                 .await
                 .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
         }
@@ -77,7 +77,7 @@ async fn send_message(
     let response_message = response.choices[0].message.clone();
     let response_content = response_message.clone().content.ok_or(Error::from(actix_web::error::ErrorInternalServerError(String::from("No content in AI response"))))?;
     
-    Message::new(&app_state.pool, chat_id.clone(), String::from("assistant"), response_content)
+    insert_message(&app_state.pool, &app_state.openai_client, chat_id.clone(), String::from("assistant"), response_content)
         .await
         .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
 
