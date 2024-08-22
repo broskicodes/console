@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use sqlx::{prelude::FromRow, query, Pool, Postgres};
+use sqlx::{prelude::FromRow, query, query_as, Pool, Postgres};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, FromRow)]
@@ -47,5 +47,22 @@ impl Message {
         .await?;
 
         Ok(message)
+    }
+
+    pub async fn get_all_messages_for_chat(pool: &Pool<Postgres>, chat_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+        let messages = query_as!(
+            Self,
+            r#"
+            SELECT id, chat_id, role, content, created_at, updated_at, deleted_at 
+            FROM messages 
+            WHERE chat_id = $1 AND deleted_at IS NULL
+            ORDER BY created_at ASC
+            "#,
+            chat_id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(messages)
     }
 }
