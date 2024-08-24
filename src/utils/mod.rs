@@ -1,27 +1,18 @@
 pub mod constants;
+pub mod graph;
 
 use std::sync::Arc;
 
 use async_openai::{config::OpenAIConfig, types::{ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionResponseFormat, ChatCompletionResponseFormatType, CreateChatCompletionRequestArgs, CreateEmbeddingRequestArgs}, Client};
-use neo4rs::{query, Query};
-use sqlx::PgPool;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{model::{message::Message, message_embedding::MessageEmbedding}, types::ai::{CypherQueries, PromptFlavour}, AppState};
+use crate::{model::{Message, MessageEmbedding}, types::{CypherQueries, GraphData, PromptFlavour}, utils::constants::GRAPH_DATA_DEF, AppState};
 
 use self::constants::GRAPH_SCHEMA;
+use self::graph::run_graph_queries;
 
-pub async fn insert_message_with_embedding(
-    pool: &PgPool,
-    openai_client: &Client<OpenAIConfig>,
-    chat_id: Uuid,
-    role: String,
-    content: String,
-) -> Result<(), anyhow::Error> {
-    let message = Message::new(pool, chat_id.clone(), role.clone(), content.clone())
-        .await?;
-
+pub async fn get_embedding(openai_client: &Client<OpenAIConfig>, content: String) -> Result<Vec<f32>, anyhow::Error> {
     let request = CreateEmbeddingRequestArgs::default()
         .model("text-embedding-3-small")
         .dimensions(384 as u32)
@@ -38,7 +29,21 @@ pub async fn insert_message_with_embedding(
         .embedding
         .clone();
 
-    MessageEmbedding::new(pool, message.id, embedding, None).await?;
+    Ok(embedding)
+}
+
+pub async fn insert_message_with_embedding(
+    app_state: Arc<AppState>,
+    chat_id: Uuid,
+    role: String,
+    content: String,
+) -> Result<(), anyhow::Error> {
+    let message = Message::new(&app_state.pool, chat_id.clone(), role.clone(), content.clone())
+        .await?;
+
+    let embedding = get_embedding(&app_state.openai_client, content).await?;
+
+    MessageEmbedding::new(&app_state.pool, message.id, embedding, None).await?;
 
     Ok(())
 }
@@ -65,6 +70,8 @@ pub async fn create_knowledge_from_chat(app_state: Arc<AppState>, chat_id: Uuid)
                     PromptFlavour::ExtractEntities.prompt_template()
                         .replace("{interview}", &interview)
                         .replace("{graph_schema}", GRAPH_SCHEMA)
+                        .replace("{graph_data}", GRAPH_DATA_DEF)
+                        .replace("{date}", &chrono::Local::now().format("%B %d, %Y").to_string())
                 )
                 .build()?
             )
@@ -74,22 +81,17 @@ pub async fn create_knowledge_from_chat(app_state: Arc<AppState>, chat_id: Uuid)
     let response = client.chat().create(request).await?;
     let content = response.choices[0].message.content.clone().ok_or(anyhow::anyhow!("No content in AI response"))?;
 
-    let queries: CypherQueries = serde_json::from_str(&content)
-        .map_err(|e| anyhow::anyhow!("Failed to parse JSON: {}", e))?;
+    info!("Generated AI response.");
 
-    info!("Running queries: {:?}", queries.queries);
-    
+    let graph_data: GraphData = serde_json::from_str(&content)?;
+    let queries: CypherQueries = graph_data.into_queries(&app_state.openai_client).await?;
+
+    info!("Generated {} Cypher queries.", queries.queries.len());
+
     let graph = app_state.graph.clone();
-    let mut txn = graph.start_txn().await?;
-    let _ = txn.run_queries(
-        queries.queries
-            .iter()
-            .map(|q| query(q))
-            .collect::<Vec<Query>>()
-    )
-    .await?;
+    run_graph_queries(&graph, queries.queries).await?;
 
-    txn.commit().await?;
+    info!("Knowledge graph created.");
 
     Ok(content)
 }

@@ -5,7 +5,7 @@ use async_openai::types::{ChatCompletionRequestMessage, ChatCompletionRequestSys
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{model::{chat::Chat, message::Message}, types::ai::SendMessageRequest, utils::{create_knowledge_from_chat, insert_message_with_embedding}, AppState};
+use crate::{model::{Chat, Message}, types::SendMessageRequest, utils::{create_knowledge_from_chat, get_embedding, graph::search_graph, insert_message_with_embedding}, AppState};
 
 #[post("/send-message")]
 async fn send_message(
@@ -57,7 +57,7 @@ async fn send_message(
                 _ => return Err(Error::from(actix_web::error::ErrorInternalServerError(String::from("Last message must be a user message")))),
             };
             
-            insert_message_with_embedding(&app_state.pool, &app_state.openai_client, chat_id.clone(), role, content)
+            insert_message_with_embedding(app_state.clone().into_inner(), chat_id.clone(), role, content)
                 .await
                 .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
         }
@@ -98,7 +98,7 @@ async fn send_message(
         });
     }
     
-    insert_message_with_embedding(&app_state.pool, &app_state.openai_client, chat_id.clone(), String::from("assistant"), response_content)
+    insert_message_with_embedding(app_state.clone().into_inner(), chat_id.clone(), String::from("assistant"), response_content)
         .await
         .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
 
@@ -117,4 +117,20 @@ async fn create_knowledge_graph(
         .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
 
     Ok(web::Json(schema))
+}
+
+#[post("/search-graph")]
+async fn search_knowledge_graph(
+    app_state: web::Data<AppState>,
+    // req_body: web::Json<SearchGraphRequest>
+) -> Result<web::Json<String>, Error> {
+    let embedding = get_embedding(&app_state.openai_client, String::from("What are my goals?"))
+        .await
+        .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+
+    let (entities, relations) = search_graph(&app_state.graph, "user1", embedding, 0.2)
+        .await
+        .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+
+    Ok(web::Json(format!("Entities: {:?}\nRelations: {:?}", entities, relations)))
 }

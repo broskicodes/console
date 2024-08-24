@@ -2,11 +2,6 @@ use async_openai::types::ChatCompletionRequestMessage;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CypherQueries {
-    pub queries: Vec<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "lowercase")]
 #[sqlx(type_name = "prompt_flavour", rename_all = "lowercase")]
@@ -54,12 +49,16 @@ impl PromptFlavour {
                 "<graph_schema>\n",
                 "{graph_schema}\n",
                 "</graph_schema>\n",
+                "<graph_data>\n",
+                "{graph_data}\n",
+                "</graph_data>\n",
+                "Today is {date}.\n",
                 "Your name is Buddy. You are an expert at parsing text to extract entities for a Neo4J knowledge graph.\n",
                 "The text to be parsed is provided to you above in <interview></interview> tags. It contains a conversation between a user and an AI companion where the user shares information about their interests, motivations, and goals.\n",
                 "The schema for the knowledge graph is also provided to you above in <graph_schema></graph_schema> tags. This schema defines the entities and relationships that will be used to represent the user's information in the knowledge graph.\n",
-                "Your task is to extract instances of these entities and relationships from the interview text. You will use the schema to inform the types of entities and relationships you can extract.\n",
-                "You will output a list of Cypher 'CREATE' and 'MATCH' statements that can be executed to insert the extracted entities and relationships into the Neo4J knowledge graph.\n",
-                "You must output a JSON object with a single property 'queries' that contains an array of Cypher 'CREATE' statements. Each statement must be a string."
+                "Your task is to extract instances of these entities and relationships from the interview text. You will use the graph schema to inform the types of entities and relationships you can extract.\n",
+                "You will output a JSON object that conforms to the JSON schema in <graph_data></graph_data> tags.\n",
+                "Your output must be a valid JSON object!"
             ),
         }
     }

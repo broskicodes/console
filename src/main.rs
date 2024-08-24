@@ -86,6 +86,7 @@ async fn actix_web(
                 .service(web::scope("/ai")
                     .service(routes::ai::send_message)
                     .service(routes::ai::create_knowledge_graph)
+                    .service(routes::ai::search_knowledge_graph)
                 )
                 .wrap(Logger::default())
                 .wrap(TracingLogger::default())

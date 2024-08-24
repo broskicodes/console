@@ -225,195 +225,312 @@ pub const NEO4J_SCHEMA_DEFINITION: &str = r##"{
 }"##;
 
 pub const GRAPH_SCHEMA: &str = r##"{
-  "graphSchemaRepresentation": {
-    "version": "1.0",
-    "graphSchema": {
-      "nodeLabels": [
-        {
-          "$id": "User",
-          "token": "User"
-        },
-        {
-          "$id": "Interest",
-          "token": "Interest"
-        },
-        {
-          "$id": "Goal",
-          "token": "Goal"
-        },
-        {
-          "$id": "Motivation",
-          "token": "Motivation"
-        },
-        {
-          "$id": "Task",
-          "token": "Task"
-        }
-      ],
-      "relationshipTypes": [
-        {
-          "$id": "hasInterest",
-          "token": "HAS_INTEREST"
-        },
-        {
-          "$id": "hasGoal",
-          "token": "HAS_GOAL"
-        },
-        {
-          "$id": "isMotivatedBy",
-          "token": "IS_MOTIVATED_BY"
-        },
-        {
-          "$id": "hasTask",
-          "token": "HAS_TASK"
-        }
-      ],
-      "nodeObjectTypes": [
-        {
-          "$id": "User",
-          "labels": [
-            {
-              "$ref": "User"
-            }
-          ],
-          "properties": [
-            {
-              "token": "name",
-              "nullable": false,
-              "type": "string"
-            },
-            {
-              "token": "profession",
-              "nullable": true,
-              "type": "string"
-            }
-          ]
-        },
-        {
-          "$id": "Interest",
-          "labels": [
-            {
-              "$ref": "Interest"
-            }
-          ],
-          "properties": [
-            {
-              "token": "name",
-              "nullable": false,
-              "type": "string"
-            }
-          ]
-        },
-        {
-          "$id": "Goal",
-          "labels": [
-            {
-              "$ref": "Goal"
-            }
-          ],
-          "properties": [
-            {
-              "token": "description",
-              "nullable": false,
-              "type": "string"
-            },
-            {
-              "token": "timeframe",
-              "nullable": true,
-              "type": "string"
-            }
-          ]
-        },
-        {
-          "$id": "Motivation",
-          "labels": [
-            {
-              "$ref": "Motivation"
-            }
-          ],
-          "properties": [
-            {
-              "token": "reason",
-              "nullable": false,
-              "type": "string"
-            }
-          ]
-        },
-        {
-          "$id": "Task",
-          "labels": [
-            {
-              "$ref": "Task"
-            }
-          ],
-          "properties": [
-            {
-              "token": "action",
-              "nullable": false,
-              "type": "string"
-            },
-            {
-              "token": "status",
-              "nullable": true,
-              "type": "string"
-            }
-          ]
-        }
-      ],
-      "relationshipObjectTypes": [
-        {
-          "$id": "UserHasInterest",
-          "type": {
-            "$ref": "hasInterest"
+  "graphSchema": {
+    "nodeLabels": [
+      {
+        "$id": "user",
+        "token": "User"
+      },
+      {
+        "$id": "interest",
+        "token": "Interest"
+      },
+      {
+        "$id": "goal",
+        "token": "Goal"
+      },
+      {
+        "$id": "motivation",
+        "token": "Motivation"
+      },
+      {
+        "$id": "task",
+        "token": "Task"
+      },
+      {
+        "$id": "date",
+        "token": "Date"
+      }
+    ],
+    "relationshipTypes": [
+      {
+        "$id": "interestedIn",
+        "token": "INTERESTED_IN"
+      },
+      {
+        "$id": "linkedTo",
+        "token": "LINKED_TO"
+      },
+      {
+        "$id": "hasGoal",
+        "token": "HAS_GOAL"
+      },
+      {
+        "$id": "motivatedBy",
+        "token": "MOTIVATED_BY"
+      },
+      {
+        "$id": "partOf",
+        "token": "PART_OF"
+      },
+      {
+        "$id": "createdOn",
+        "token": "CREATED_ON"
+      }
+    ],
+    "nodeObjectTypes": [
+      {
+        "$id": "user",
+        "labels": [
+          {
+            "$ref": "user"
+          }
+        ],
+        "properties": [
+          {
+            "token": "user_id",
+            "nullable": false,
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "$id": "interest",
+        "labels": [
+          {
+            "$ref": "interest"
+          }
+        ],
+        "properties": [
+          {
+            "token": "name",
+            "nullable": false,
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "$id": "goal",
+        "labels": [
+          {
+            "$ref": "goal"
+          }
+        ],
+        "properties": [
+          {
+            "token": "description",
+            "nullable": false,
+            "type": "string"
           },
-          "from": {
-            "$ref": "User"
+          {
+            "token": "timeframe",
+            "nullable": true,
+            "type": "string",
+            "enum": [
+              "short-term",
+              "medium-term",
+              "long-term"
+            ]
+          }
+        ]
+      },
+      {
+        "$id": "motivation",
+        "labels": [
+          {
+            "$ref": "motivation"
+          }
+        ],
+        "properties": [
+          {
+            "token": "title",
+            "nullable": false,
+            "type": "string"
           },
-          "to": {
-            "$ref": "Interest"
+          {
+            "token": "reason",
+            "nullable": false,
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "$id": "task",
+        "labels": [
+          {
+            "$ref": "task"
+          }
+        ],
+        "properties": [
+          {
+            "token": "action",
+            "nullable": false,
+            "type": "string"
           },
-          "properties": []
+          {
+            "token": "status",
+            "nullable": true,
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "completed",
+              "failed"
+            ]
+          }
+        ]
+      },
+      {
+        "$id": "date",
+        "labels": [
+          {
+            "$ref": "date"
+          }
+        ],
+        "properties": [
+          {
+            "token": "day",
+            "nullable": false,
+            "type": "integer"
+          },
+          {
+            "token": "month",
+            "nullable": false,
+            "type": "integer"
+          },
+          {
+            "token": "year",
+            "nullable": false,
+            "type": "integer"
+          }
+        ]
+      }
+    ],
+    "relationshipObjectTypes": [
+      {
+        "$id": "userHasInterest",
+        "type": {
+          "$ref": "interestedIn"
         },
-        {
-          "$id": "UserHasGoal",
-          "type": {
-            "$ref": "hasGoal"
-          },
-          "from": {
-            "$ref": "User"
-          },
-          "to": {
-            "$ref": "Goal"
-          },
-          "properties": []
+        "from": {
+          "$ref": "user"
         },
-        {
-          "$id": "GoalIsMotivatedBy",
-          "type": {
-            "$ref": "isMotivatedBy"
-          },
-          "from": {
-            "$ref": "Goal"
-          },
-          "to": {
-            "$ref": "Motivation"
-          },
-          "properties": []
+        "to": {
+          "$ref": "interest"
         },
-        {
-          "$id": "TaskBelongsToGoal",
-          "type": {
-            "$ref": "hasTask"
-          },
-          "from": {
-            "$ref": "Goal"
-          },
-          "to": {
-            "$ref": "Task"
-          },
-          "properties": []
-        }
-      ]
-    }
+        "properties": []
+      },
+      {
+        "$id": "userHasGoal",
+        "type": {
+          "$ref": "hasGoal"
+        },
+        "from": {
+          "$ref": "user"
+        },
+        "to": {
+          "$ref": "goal"
+        },
+        "properties": []
+      },
+      {
+        "$id": "goalLinkedToInterest",
+        "type": {
+          "$ref": "linkedTo"
+        },
+        "from": {
+          "$ref": "goal"
+        },
+        "to": {
+          "$ref": "interest"
+        },
+        "properties": []
+      },
+      {
+        "$id": "goalIsMotivatedBy",
+        "type": {
+          "$ref": "motivatedBy"
+        },
+        "from": {
+          "$ref": "goal"
+        },
+        "to": {
+          "$ref": "motivation"
+        },
+        "properties": []
+      },
+      {
+        "$id": "taskBelongsToGoal",
+        "type": {
+          "$ref": "partOf"
+        },
+        "from": {
+          "$ref": "task"
+        },
+        "to": {
+          "$ref": "goal"
+        },
+        "properties": []
+      },
+      {
+        "$id": "taskCreatedOn",
+        "type": {
+          "$ref": "createdOn"
+        },
+        "from": {
+          "$ref": "task"
+        },
+        "to": {
+          "$ref": "date"
+        },
+        "properties": []
+      }
+    ]
   }
 }"##;
+
+
+pub const GRAPH_DATA_DEF: &str = r#"{
+    "type": "object",
+        "properties": {
+        "nodes": {
+            "type": "array",
+            "items": {
+            "type": "object",
+            "properties": {
+                "id": {
+                "type": "string"
+                },
+                "label": {
+                "type": "string"
+                },
+                "props": {
+                "type": "object",
+                "additionalProperties": true
+                }
+            },
+            "required": ["id", "label", "props"]
+            }
+        },
+        "relationships": {
+            "type": "array",
+            "items": {
+            "type": "object",
+            "properties": {
+                "source": {
+                "type": "string"
+                },
+                "target": {
+                "type": "string"
+                },
+                "label": {
+                "type": "string"
+                }
+            },
+            "required": ["source", "target", "label"]
+            }
+        }
+    },
+    "required": ["nodes", "relationships"]
+}"#;
+    
