@@ -1,16 +1,14 @@
 use std::collections::HashMap;
 
 use async_openai::{config::OpenAIConfig, Client};
-use neo4rs::{EndNodeId, Labels, StartNodeId, Type};
 use serde::{Deserialize, Serialize};
 
-use crate::utils::get_embedding;
+use crate::utils::config::Convinience;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CypherQueries {
     pub queries: Vec<String>,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphNode {
@@ -91,7 +89,7 @@ impl GraphData {
             };
 
             if let Some(embedding_content) = embedding_content {
-                let embedding = get_embedding(openai_client, embedding_content).await?;
+                let embedding = openai_client.get_embedding(embedding_content).await?;
 
                 node_queries.push(format!(
                     "CREATE ({}:{} {{ id: \"{}\", embedding: {:?}, {} }})", 
@@ -138,65 +136,4 @@ impl GraphData {
             queries: node_queries.into_iter().chain(rel_queries).collect(),
         })
     }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub enum Neo4jNode {
-    User(User),
-    Interest(Interest),
-    Goal(Goal),
-    Motivation(Motivation),
-    Task(Task),
-    Date(Date),
-}
-
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq, Hash)]
-pub struct Neo4jRelation {
-    #[serde(rename = "start_node_id")]
-    src_id: StartNodeId,
-    #[serde(rename = "end_node_id")]
-    dst_id: EndNodeId,
-    #[serde(rename = "typ")]
-    rel: Type,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct User {
-    labels: Labels,
-    user_id: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct Interest {
-    labels: Labels,
-    name: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct Goal {
-    labels: Labels,
-    description: String,
-    timeframe: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct Motivation {
-    labels: Labels,
-    title: String,
-    reason: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct Task {
-    labels: Labels,
-    action: String,
-    status: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct Date {
-    labels: Labels,
-    day: u8,
-    month: u8,
-    year: u16,
 }

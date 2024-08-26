@@ -3,50 +3,16 @@ use actix_web::middleware::Logger;
 use async_openai::config::OpenAIConfig;
 use async_openai::Client;
 use neo4rs::{ConfigBuilder, Graph};
-use serde::Deserialize;
 use shuttle_actix_web::ShuttleActixWeb;
 use shuttle_runtime::SecretStore;
 use sqlx::PgPool;
 use tracing_actix_web::TracingLogger;
+use utils::config::{AppEnv, AppState};
 
 pub mod routes;
 pub mod types;
 pub mod model;
 pub mod utils;
-
-#[derive(Clone)]
-pub struct AppState {
-    pool: PgPool,
-    graph: Graph,
-    openai_client: Client<OpenAIConfig>,
-}
-
-#[derive(Deserialize, Clone, Debug)]
-pub struct AppEnv {
-    database_url: String,
-    openai_api_key: String,
-    neo4j_uri: String,
-    neo4j_password: String,
-}
-
-impl AppEnv {
-    fn new(secret_store: &SecretStore) -> Result<Self, anyhow::Error> {
-        Ok(AppEnv {
-            database_url: secret_store.get("DATABASE_URL").ok_or_else(|| {
-                anyhow::anyhow!("DATABASE_URL is not set")
-            })?,
-            openai_api_key: secret_store.get("OPENAI_API_KEY").ok_or_else(|| {
-                anyhow::anyhow!("OPENAI_API_KEY is not set")
-            })?,
-            neo4j_uri: secret_store.get("NEO4J_URI").ok_or_else(|| {
-                anyhow::anyhow!("NEO4J_URI is not set")
-            })?,
-            neo4j_password: secret_store.get("NEO4J_PASSWORD").ok_or_else(|| {
-                anyhow::anyhow!("NEO4J_PASSWORD is not set")
-            })?,
-        })
-    }
-}
 
 #[shuttle_runtime::main]
 async fn actix_web(

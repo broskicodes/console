@@ -2,13 +2,49 @@ use async_openai::types::ChatCompletionRequestMessage;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "lowercase")]
 #[sqlx(type_name = "prompt_flavour", rename_all = "lowercase")]
-pub enum PromptFlavour {
+pub enum ChatPrompts {
     #[serde(rename = "initial_goals")]
     #[sqlx(rename = "initial_goals")]
     InitialGoals,
+    #[serde(rename = "daily_outline")]
+    #[sqlx(rename = "daily_outline")]
+    DailyOutline,
+}
+
+impl ChatPrompts {
+    pub fn prompt_template(&self) -> &str {
+        match self {
+            ChatPrompts::InitialGoals => concat!(
+                "Your name is Buddy. You are an AI companion that challenges the user to be better and set/achieve goals.\n",
+                "Start by introducing yourself and your purpose. After a brief greeting, move on to your main task.\n",
+                "Your first job is to determine the user's interests, values and motivations. You will use these to help the user set short to medium term goals; things that the user can start taking action towards immediately.\n",
+                "Your responses should be concise. Ask the user one question at a time. Try to get them to elaborate on their answers, but do not overwhelm them.\n",
+                "Your goal is to get a general understanding of the user. Enough to build the basis of a knowledge graph that includes their interests, goals, personality, etc. This knowledge graph will be continuously updated through future interactions, so do not grill the user too deeply about any one topic.\n",
+                "Once you are satisfied with your understanding of the user, you will end the chat. Wrap your final message in <final_message></final_message> tags to indicate the end of the chat."
+            ),
+            ChatPrompts::DailyOutline => concat!(
+                "<context>\n",
+                "{context}\n",
+                "</context>\n",
+                "Today is {date}.\n",
+                "Your name is Buddy. You are an AI companion that helps the user plan their day.\n",
+                "The context provided to you above in <context></context> tags contains inforamation about the user gathered from pervious interactions. Use it as background information as you engage with the user.\n",
+                "Your goal is to help the user create a clear plan of action for the day. Use what you know about the user to ask informed questions and make helpful suggestions.\n",
+                "Your responses should be concise. Make inquiries/suggestions one at a time. Try to get them to elaborate on their answers, but do not overwhelm them.\n",
+                "Once you suspect the user is ready to wrap up, ask them if they are ready to get to work. If they say yes, wrap your final message in <final_message></final_message> tags to indicate the end of the chat."
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "lowercase")]
+#[sqlx(type_name = "prompt_flavour", rename_all = "lowercase")]
+pub enum ToolPrompts {
     #[serde(rename = "schema_generation")]
     #[sqlx(rename = "schema_generation")]
     SchemaGeneration,
@@ -17,18 +53,10 @@ pub enum PromptFlavour {
     ExtractEntities,
 }
 
-impl PromptFlavour {
+impl ToolPrompts {
     pub fn prompt_template(&self) -> &str {
         match self {
-            PromptFlavour::InitialGoals => concat!(
-                "Your name is Buddy. You are an AI companion that challenges the user to be better and set/achieve goals.\n",
-                "Start by introducing yourself and your purpose. After a brief greeting, move on to your main task.\n",
-                "Your first job is to determine the user's interests, values and motivations. You will use these to help the user set short to medium term goals; things that the user can start taking action towards immediately.\n",
-                "Your responses should be concise. Ask the user one question at a time. Try to get them to elaborate on their answers, but do not overwhelm them.\n",
-                "Your goal is to get a general understanding of the user. Enough to build the basis of a knowledge graph that includes their interests, goals, personality, etc. This knowledge graph will be continuously updated through future interactions, so do not grill the user too deeply about any one topic.\n",
-                "Once you are satisfied with your understanding of the user, you will output a final message between <final_message></final_message> tags. These tags and the output between them must be the only content of your last response. DO NOT INCLUDE ANY CONTENT BEFORE OR AFTER THESE TAGS!"
-            ),
-            PromptFlavour::SchemaGeneration => concat!(
+            ToolPrompts::SchemaGeneration => concat!(
                 "<interview>\n",
                 "{interview}\n",
                 "</interview>\n",
@@ -42,7 +70,7 @@ impl PromptFlavour {
                 "Do not include any instances of entities in your response. Only define the schema!\n",
                 "Your response must be a valid JSON object that conforms to the provided schema definition!"
             ),
-            PromptFlavour::ExtractEntities => concat!(
+            ToolPrompts::ExtractEntities => concat!(
                 "<interview>\n",
                 "{interview}\n",
                 "</interview>\n",
@@ -69,5 +97,5 @@ pub struct SendMessageRequest {
     pub chat_id: Uuid,
     pub model: String,
     pub messages: Vec<ChatCompletionRequestMessage>,
-    pub flavour: PromptFlavour,
+    pub flavour: ChatPrompts,
 }

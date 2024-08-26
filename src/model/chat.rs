@@ -2,12 +2,12 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, query, query_as, Pool, Postgres};
 use uuid::Uuid;
 
-use crate::types::ai::PromptFlavour;
+use crate::types::ai::ChatPrompts;
 
 #[derive(Debug, Clone, FromRow)]
 pub struct Chat {
     pub id: Uuid,
-    pub flavour: PromptFlavour,
+    pub flavour: ChatPrompts,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
     pub deleted_at: Option<DateTime<Utc>>,
@@ -17,7 +17,7 @@ impl Chat {
     pub async fn new(
         pool: &Pool<Postgres>,
         chat_id: Option<Uuid>,
-        flavour: PromptFlavour,
+        flavour: ChatPrompts,
     ) -> Result<Self, sqlx::Error> {
         let chat = Self {
             id: chat_id.unwrap_or(Uuid::new_v4()),
@@ -33,7 +33,7 @@ impl Chat {
             VALUES ($1, $2, $3, $4, $5)
             "#,
             chat.id,
-            chat.flavour.clone() as PromptFlavour,
+            chat.flavour.clone() as ChatPrompts,
             chat.created_at,
             chat.updated_at,
             chat.deleted_at
@@ -48,7 +48,7 @@ impl Chat {
         let chat = query_as!(
             Self,
             r#"
-            SELECT id, flavour as "flavour: PromptFlavour", created_at, updated_at, deleted_at 
+            SELECT id, flavour as "flavour: ChatPrompts", created_at, updated_at, deleted_at 
             FROM chats 
             WHERE id = $1
             "#,

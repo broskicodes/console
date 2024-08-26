@@ -2,10 +2,12 @@ use std::str::FromStr;
 
 use actix_web::{post, web, Error};
 use async_openai::types::{ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageContent, ChatCompletionResponseMessage, CreateChatCompletionRequestArgs};
+use chrono::Local;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{model::{Chat, Message}, types::SendMessageRequest, utils::{create_knowledge_from_chat, get_embedding, graph::search_graph, insert_message_with_embedding}, AppState};
+use crate::{model::{Chat, Message}, types::SendMessageRequest, utils::graph::{create_knowledge_from_chat, search_graph}, AppState};
+use crate::utils::config::Convinience;
 
 #[post("/send-message")]
 async fn send_message(
@@ -20,7 +22,11 @@ async fn send_message(
     let mut messages: Vec<ChatCompletionRequestMessage> = vec![
         ChatCompletionRequestMessage::System(
             ChatCompletionRequestSystemMessageArgs::default()
-            .content(chat_sys_prompt)
+            .content(
+                chat_sys_prompt
+                    .replace("{date}", &Local::now().format("%Y-%m-%d").to_string())
+                    .replace("{context}", "")
+            )
             .build()
             .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?
         )
@@ -57,7 +63,7 @@ async fn send_message(
                 _ => return Err(Error::from(actix_web::error::ErrorInternalServerError(String::from("Last message must be a user message")))),
             };
             
-            insert_message_with_embedding(app_state.clone().into_inner(), chat_id.clone(), role, content)
+            Message::new_with_embedding(&app_state.pool, &app_state.openai_client, chat_id.clone(), role, content)
                 .await
                 .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
         }
@@ -98,7 +104,7 @@ async fn send_message(
         });
     }
     
-    insert_message_with_embedding(app_state.clone().into_inner(), chat_id.clone(), String::from("assistant"), response_content)
+    Message::new_with_embedding(&app_state.pool, &app_state.openai_client, chat_id.clone(), String::from("assistant"), response_content)
         .await
         .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
 
@@ -124,7 +130,7 @@ async fn search_knowledge_graph(
     app_state: web::Data<AppState>,
     // req_body: web::Json<SearchGraphRequest>
 ) -> Result<web::Json<String>, Error> {
-    let embedding = get_embedding(&app_state.openai_client, String::from("What are my goals?"))
+    let embedding = app_state.openai_client.get_embedding(String::from("What are my goals?"))
         .await
         .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
 

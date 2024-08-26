@@ -1,6 +1,11 @@
+use async_openai::{config::OpenAIConfig, Client};
 use chrono::{DateTime, Utc};
 use sqlx::{prelude::FromRow, query, query_as, Pool, Postgres};
 use uuid::Uuid;
+
+use crate::utils::config::Convinience;
+
+use super::MessageEmbedding;
 
 #[derive(Debug, Clone, FromRow)]
 pub struct Message {
@@ -47,6 +52,24 @@ impl Message {
         .await?;
 
         Ok(message)
+    }
+
+    pub async fn new_with_embedding(
+        pool: &Pool<Postgres>,
+        openai_client: &Client<OpenAIConfig>,
+        chat_id: Uuid, 
+        role: String, 
+        content: String
+    ) -> Result<(Self, MessageEmbedding), sqlx::Error> {
+        let message = Self::new(pool, chat_id, role, content.clone()).await?;
+
+        let embedding = openai_client.get_embedding(content.clone())
+            .await
+            .map_err(|e| sqlx::Error::Decode(e.into()))?;
+
+        let message_embedding = MessageEmbedding::new(pool, message.id, embedding, None).await?;
+
+        Ok((message, message_embedding))
     }
 
     pub async fn get_all_messages_for_chat(pool: &Pool<Postgres>, chat_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
