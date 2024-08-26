@@ -354,7 +354,6 @@ pub const GRAPH_SCHEMA: &str = r##"{
   }
 }"##;
 
-
 pub const GRAPH_DATA_DEF: &str = r#"{
     "type": "object",
     "properties": {
@@ -398,4 +397,3 @@ pub const GRAPH_DATA_DEF: &str = r#"{
     },
     "required": ["nodes", "relationships"]
 }"#;
-    

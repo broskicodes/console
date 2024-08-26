@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use sqlx::{FromRow, query, query_as, Pool, Postgres};
+use sqlx::{query, query_as, FromRow, Pool, Postgres};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, FromRow)]
@@ -11,10 +11,7 @@ pub struct User {
 }
 
 impl User {
-    pub async fn new(
-        pool: &Pool<Postgres>,
-        user_id: Uuid
-    ) -> Result<Self, sqlx::Error> {
+    pub async fn new(pool: &Pool<Postgres>, user_id: Uuid) -> Result<Self, sqlx::Error> {
         let user = Self {
             id: user_id,
             created_at: Utc::now(),
@@ -33,7 +30,7 @@ impl User {
             user.deleted_at
         )
         .execute(pool)
-        .await?; 
+        .await?;
 
         Ok(user)
     }

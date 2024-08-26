@@ -2,7 +2,6 @@ use async_openai::types::ChatCompletionRequestMessage;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "lowercase")]
 #[sqlx(type_name = "chat_prompt", rename_all = "lowercase")]

@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use sqlx::{FromRow, query, query_as, Pool, Postgres};
+use sqlx::{query, query_as, FromRow, Pool, Postgres};
 use uuid::Uuid;
 
 use crate::types::ai::ChatPrompts;
@@ -43,7 +43,7 @@ impl Chat {
             chat.user_id
         )
         .execute(pool)
-        .await?; 
+        .await?;
 
         Ok(chat)
     }

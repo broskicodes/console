@@ -1,6 +1,13 @@
 use std::future::{ready, Ready};
 
-use actix_web::{body::MessageBody, dev::{Payload, ServiceRequest, ServiceResponse}, error::{ErrorInternalServerError, ErrorUnauthorized}, middleware::Next, web::Data, Error, FromRequest, HttpMessage, HttpRequest};
+use actix_web::{
+    body::MessageBody,
+    dev::{Payload, ServiceRequest, ServiceResponse},
+    error::{ErrorInternalServerError, ErrorUnauthorized},
+    middleware::Next,
+    web::Data,
+    Error, FromRequest, HttpMessage, HttpRequest,
+};
 use uuid::Uuid;
 
 use crate::{model::User, utils::config::AppState};
@@ -44,9 +51,8 @@ pub async fn authenticate_user(
                 .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
         }
 
-        req.extensions_mut().insert(AuthenticatedUser { 
-            user_id: uuid
-        });
+        req.extensions_mut()
+            .insert(AuthenticatedUser { user_id: uuid });
     } else {
         return Err(Error::from(ErrorUnauthorized("User ID is required")));
     }

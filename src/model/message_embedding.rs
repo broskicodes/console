@@ -27,12 +27,12 @@ impl MessageEmbedding {
             r#"INSERT INTO message_embeddings (id, message_id, embedding, section) 
             VALUES ($1, $2, $3, $4)"#,
         )
-            .bind(me.id)
-            .bind(me.message_id)
-            .bind(me.embedding.as_slice())
-            .bind(me.section)
-            .execute(pool)
-            .await?;
+        .bind(me.id)
+        .bind(me.message_id)
+        .bind(me.embedding.as_slice())
+        .bind(me.section)
+        .execute(pool)
+        .await?;
 
         Ok(me)
     }

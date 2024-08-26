@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use neo4rs::{EndNodeId, Node, StartNodeId, Type, Error};
+use neo4rs::{EndNodeId, Error, Node, StartNodeId, Type};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -28,7 +28,7 @@ impl Neo4jNode {
 
 impl TryInto<Neo4jNode> for Node {
     type Error = Error;
-    
+
     fn try_into(self) -> Result<Neo4jNode, Error> {
         let labels = self.labels();
         let node_type = *labels
@@ -37,31 +37,46 @@ impl TryInto<Neo4jNode> for Node {
 
         let entity = match node_type {
             "User" => {
-                let user: UserNode = self.to::<UserNode>().map_err(|e| Error::DeserializationError(e))?;
+                let user: UserNode = self
+                    .to::<UserNode>()
+                    .map_err(|e| Error::DeserializationError(e))?;
                 Neo4jNode::User(user)
-            },
+            }
             "Interest" => {
-                let interest: Interest = self.to::<Interest>().map_err(|e| Error::DeserializationError(e))?;
+                let interest: Interest = self
+                    .to::<Interest>()
+                    .map_err(|e| Error::DeserializationError(e))?;
                 Neo4jNode::Interest(interest)
-            },
+            }
             "Goal" => {
-                let goal: Goal = self.to::<Goal>().map_err(|e| Error::DeserializationError(e))?;
+                let goal: Goal = self
+                    .to::<Goal>()
+                    .map_err(|e| Error::DeserializationError(e))?;
                 Neo4jNode::Goal(goal)
-            },
+            }
             "Motivation" => {
-                let motivation: Motivation = self.to::<Motivation>().map_err(|e| Error::DeserializationError(e))?;
+                let motivation: Motivation = self
+                    .to::<Motivation>()
+                    .map_err(|e| Error::DeserializationError(e))?;
                 Neo4jNode::Motivation(motivation)
-            },
+            }
             "Task" => {
-                let task: Task = self.to::<Task>().map_err(|e| Error::DeserializationError(e))?;
+                let task: Task = self
+                    .to::<Task>()
+                    .map_err(|e| Error::DeserializationError(e))?;
                 Neo4jNode::Task(task)
-            },
+            }
             "Date" => {
-                let date: Date = self.to::<Date>().map_err(|e| Error::DeserializationError(e))?;
+                let date: Date = self
+                    .to::<Date>()
+                    .map_err(|e| Error::DeserializationError(e))?;
                 Neo4jNode::Date(date)
-            },
+            }
             _ => {
-                return Err(Error::UnsupportedScheme(format!("Node type {} not supported", node_type)));
+                return Err(Error::UnsupportedScheme(format!(
+                    "Node type {} not supported",
+                    node_type
+                )));
             }
         };
 
@@ -91,12 +106,21 @@ impl Neo4jGraph {
 
         for rel in &self.relations {
             let relation = &rel.rel.0;
-            let src_node = self.nodes.get(&(rel.src_id.0 as i64))
+            let src_node = self
+                .nodes
+                .get(&(rel.src_id.0 as i64))
                 .ok_or_else(|| anyhow::anyhow!("Source node {} not found", rel.src_id.0))?;
-            let dst_node = self.nodes.get(&(rel.dst_id.0 as i64))
+            let dst_node = self
+                .nodes
+                .get(&(rel.dst_id.0 as i64))
                 .ok_or_else(|| anyhow::anyhow!("Destination node {} not found", rel.dst_id.0))?;
 
-            context.push_str(&format!("{} - {} -> {}\n", src_node.to_context(), relation, dst_node.to_context()));
+            context.push_str(&format!(
+                "{} - {} -> {}\n",
+                src_node.to_context(),
+                relation,
+                dst_node.to_context()
+            ));
         }
 
         Ok(context)

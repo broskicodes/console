@@ -21,9 +21,9 @@ pub struct Message {
 impl Message {
     pub async fn new(
         pool: &Pool<Postgres>,
-        chat_id: Uuid, 
-        role: String, 
-        content: String
+        chat_id: Uuid,
+        role: String,
+        content: String,
     ) -> Result<Self, sqlx::Error> {
         let message = Self {
             id: Uuid::new_v4(),
@@ -39,13 +39,13 @@ impl Message {
             r#"
             INSERT INTO messages (id, chat_id, role, content, created_at, updated_at, deleted_at) 
             VALUES ($1, $2, $3, $4, $5, $6, $7)
-            "#, 
-            message.id, 
-            message.chat_id, 
-            message.role, 
-            message.content, 
-            message.created_at, 
-            message.updated_at, 
+            "#,
+            message.id,
+            message.chat_id,
+            message.role,
+            message.content,
+            message.created_at,
+            message.updated_at,
             message.deleted_at
         )
         .execute(pool)
@@ -57,13 +57,14 @@ impl Message {
     pub async fn new_with_embedding(
         pool: &Pool<Postgres>,
         openai_client: &Client<OpenAIConfig>,
-        chat_id: Uuid, 
-        role: String, 
-        content: String
+        chat_id: Uuid,
+        role: String,
+        content: String,
     ) -> Result<(Self, MessageEmbedding), sqlx::Error> {
         let message = Self::new(pool, chat_id, role, content.clone()).await?;
 
-        let embedding = openai_client.get_embedding(content.clone())
+        let embedding = openai_client
+            .get_embedding(content.clone())
             .await
             .map_err(|e| sqlx::Error::Decode(e.into()))?;
 
@@ -72,7 +73,10 @@ impl Message {
         Ok((message, message_embedding))
     }
 
-    pub async fn get_all_messages_for_chat(pool: &Pool<Postgres>, chat_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn get_all_messages_for_chat(
+        pool: &Pool<Postgres>,
+        chat_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         let messages = query_as!(
             Self,
             r#"
