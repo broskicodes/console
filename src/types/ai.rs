@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "lowercase")]
-#[sqlx(type_name = "prompt_flavour", rename_all = "lowercase")]
+#[sqlx(type_name = "chat_prompt", rename_all = "lowercase")]
 pub enum ChatPrompts {
     #[serde(rename = "initial_goals")]
     #[sqlx(rename = "initial_goals")]

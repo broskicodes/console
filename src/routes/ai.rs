@@ -1,13 +1,13 @@
 use std::str::FromStr;
 
 use actix_web::{post, web, Error};
-use async_openai::types::{ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageContent, ChatCompletionResponseMessage, CreateChatCompletionRequestArgs};
+use async_openai::types::{ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionResponseMessage, CreateChatCompletionRequestArgs};
 use chrono::Local;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{model::{Chat, Message}, types::SendMessageRequest, utils::graph::{create_knowledge_from_chat, search_graph}, AppState};
-use crate::utils::config::Convinience;
+use crate::{model::{Chat, Message}, types::{ChatPrompts, SendMessageRequest}, utils::graph::create_knowledge_from_chat, AppState};
+use crate::utils::config::{Parsable, Convinience};
 
 #[post("/send-message")]
 async fn send_message(
@@ -18,15 +18,44 @@ async fn send_message(
     let chat_id = body.chat_id.clone();
     let model = body.model.clone();
     let flavour = body.flavour.clone();
-    let chat_sys_prompt = flavour.prompt_template();
+
+    let last_message = body.messages.last().cloned();
+
+    let chat_sys_prompt = match flavour {
+        ChatPrompts::InitialGoals => ChatPrompts::InitialGoals.prompt_template(),
+        ChatPrompts::DailyOutline => {
+            let (embedding_content, threshold) = match &last_message {
+                Some(message) => {
+                    let (_, content) = app_state.openai_client.get_data_from_message_request(message.clone())
+                        .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+
+                    (content, 0.4)
+                }
+                None => (String::from(""), 0.0),
+            };
+
+            let embedding = app_state.openai_client.get_embedding(embedding_content)
+                .await
+                .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+
+            let context = app_state.graph.semantic_search("user", embedding, threshold)
+                .await
+                .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?
+                .to_context()
+                .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+
+            &ChatPrompts::DailyOutline.prompt_template()
+                .replace("{date}", &Local::now().format("%B %d, %Y").to_string())
+                .replace("{context}", &context)
+        },
+    };
+
+    info!("sys prompt: {}", chat_sys_prompt);
+
     let mut messages: Vec<ChatCompletionRequestMessage> = vec![
         ChatCompletionRequestMessage::System(
             ChatCompletionRequestSystemMessageArgs::default()
-            .content(
-                chat_sys_prompt
-                    .replace("{date}", &Local::now().format("%Y-%m-%d").to_string())
-                    .replace("{context}", "")
-            )
+            .content(chat_sys_prompt)
             .build()
             .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?
         )
@@ -51,18 +80,11 @@ async fn send_message(
         _ => {}
     };
 
-    match body.messages.last() {
+    match &last_message {
         Some(message) => {
-            let (role, content): (String, String) = match message {
-                ChatCompletionRequestMessage::User(user) => {
-                    match user.content.clone() {
-                        ChatCompletionRequestUserMessageContent::Text(text) => (String::from("user"), text),
-                        _ => return Err(Error::from(actix_web::error::ErrorInternalServerError(String::from("Only text messages are supported")))),
-                    }
-                }
-                _ => return Err(Error::from(actix_web::error::ErrorInternalServerError(String::from("Last message must be a user message")))),
-            };
-            
+            let (role, content) = app_state.openai_client.get_data_from_message_request(message.clone())
+                .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+
             Message::new_with_embedding(&app_state.pool, &app_state.openai_client, chat_id.clone(), role, content)
                 .await
                 .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
@@ -94,14 +116,19 @@ async fn send_message(
         .unwrap_or(None);
 
     if let Some(_) = final_message {
-        info!("Spawning thread to create knowledge graph.");
+        match flavour {
+            ChatPrompts::InitialGoals => {
+                info!("Spawning thread to create knowledge graph.");
 
-        let chat_id = chat_id.clone();
-        let app_state = app_state.clone();
+                let chat_id = chat_id.clone();
+                let app_state = app_state.clone();
 
-        tokio::spawn(async move {
-            let _ = create_knowledge_from_chat(app_state.into_inner(), chat_id);
-        });
+                tokio::spawn(async move {
+                    let _ = create_knowledge_from_chat(app_state.into_inner(), chat_id);
+                });
+            }
+            _ => {}
+        }
     }
     
     Message::new_with_embedding(&app_state.pool, &app_state.openai_client, chat_id.clone(), String::from("assistant"), response_content)
@@ -134,9 +161,10 @@ async fn search_knowledge_graph(
         .await
         .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
 
-    let (entities, relations) = search_graph(&app_state.graph, "user1", embedding, 0.2)
+    let graph = app_state.graph.semantic_search("user", embedding, 0.1)
         .await
         .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
 
-    Ok(web::Json(format!("Entities: {:?}\nRelations: {:?}", entities, relations)))
+    let context = graph.to_context().map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+    Ok(web::Json(context))
 }

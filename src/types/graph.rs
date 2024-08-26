@@ -39,18 +39,22 @@ impl GraphData {
         
         for node in self.nodes {
             let embedding_content: Option<String> = match node.label.as_str() {
-                "Interest" => Some(
-                    node.properties
+                "Interest" => {
+                    let name = node.properties
                         .get("name")
                         .ok_or_else(|| anyhow::anyhow!("Interest name not found"))?
-                        .to_string(),
-                ),
-                "Goal" => Some(
-                    node.properties
+                        .to_string();
+
+                    Some(format!("Interest: {}", name))
+                },
+                "Goal" => {
+                    let description = node.properties
                         .get("description")
                         .ok_or_else(|| anyhow::anyhow!("Goal description not found"))?
-                        .to_string(),
-                ),
+                        .to_string();
+
+                    Some(format!("Goal: {}", description))
+                },
                 "Motivation" => {
                     let title = node.properties
                         .get("title")
@@ -61,14 +65,16 @@ impl GraphData {
                         .ok_or_else(|| anyhow::anyhow!("Motivation reason not found"))?
                         .to_string();
 
-                    Some(format!("{}. {}", title, reason))
+                    Some(format!("Motivation: {} with reason {}", title, reason))
                 },
-                "Task" => Some(
-                    node.properties
+                "Task" => {
+                    let action = node.properties
                         .get("action")
                         .ok_or_else(|| anyhow::anyhow!("Task action not found"))?
-                        .to_string(),
-                ),
+                        .to_string();
+
+                    Some(format!("Task: {}", action))
+                },
                 "Date" => {
                     let day = node.properties
                         .get("day")
@@ -83,7 +89,7 @@ impl GraphData {
                         .ok_or_else(|| anyhow::anyhow!("Date year not found"))?
                         .to_string();
 
-                    Some(format!("Today is the {} of {}, {}.", day, month, year))
+                    Some(format!("Date: {} of {}, {}.", day, month, year))
                 },
                 _ => None,
             };

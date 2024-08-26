@@ -226,7 +226,7 @@ pub const NEO4J_SCHEMA_DEFINITION: &str = r##"{
 
 pub const GRAPH_SCHEMA: &str = r##"{
   "graphSchema": {
-    "nodes": [
+    "nodeTypes": [
       {
         "id_format": "user_{num}",
         "label": "User",
