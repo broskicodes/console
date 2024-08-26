@@ -80,7 +80,7 @@ impl ToolPrompts {
                 "<graph_data>\n",
                 "{graph_data}\n",
                 "</graph_data>\n",
-                "Today is {date}.\n",
+                "Today is {date}. The user's ID is {user_id}.\n",
                 "Your name is Buddy. You are an expert at parsing text to extract entities for a Neo4J knowledge graph.\n",
                 "The text to be parsed is provided to you above in <interview></interview> tags. It contains a conversation between a user and an AI companion where the user shares information about their interests, motivations, and goals.\n",
                 "The schema for the knowledge graph is also provided to you above in <graph_schema></graph_schema> tags. This schema defines the entities and relationships that will be used to represent the user's information in the knowledge graph.\n",

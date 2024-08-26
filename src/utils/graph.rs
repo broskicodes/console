@@ -9,7 +9,7 @@ use crate::utils::{config::{Parsable, AppState}, constants::{GRAPH_SCHEMA, GRAPH
 use crate::types::{CypherQueries, GraphData, ToolPrompts};
 
 
-pub async fn create_knowledge_from_chat(app_state: Arc<AppState>, chat_id: Uuid) -> Result<String, anyhow::Error> {
+pub async fn create_knowledge_from_chat(app_state: Arc<AppState>, user_id: Uuid, chat_id: Uuid) -> Result<String, anyhow::Error> {
     let messages = Message::get_all_messages_for_chat(&app_state.pool, chat_id.clone()).await?;
 
     let interview = messages.iter()
@@ -33,6 +33,7 @@ pub async fn create_knowledge_from_chat(app_state: Arc<AppState>, chat_id: Uuid)
                         .replace("{graph_schema}", GRAPH_SCHEMA)
                         .replace("{graph_data}", GRAPH_DATA_DEF)
                         .replace("{date}", &chrono::Local::now().format("%B %d, %Y").to_string())
+                        .replace("{user_id}", &user_id.to_string())
                 )
                 .build()?
             )

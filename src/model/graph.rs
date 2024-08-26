@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
 pub enum Neo4jNode {
-    User(User),
+    User(UserNode),
     Interest(Interest),
     Goal(Goal),
     Motivation(Motivation),
@@ -37,7 +37,7 @@ impl TryInto<Neo4jNode> for Node {
 
         let entity = match node_type {
             "User" => {
-                let user: User = self.to::<User>().map_err(|e| Error::DeserializationError(e))?;
+                let user: UserNode = self.to::<UserNode>().map_err(|e| Error::DeserializationError(e))?;
                 Neo4jNode::User(user)
             },
             "Interest" => {
@@ -104,11 +104,11 @@ impl Neo4jGraph {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct User {
+pub struct UserNode {
     user_id: String,
 }
 
-impl User {
+impl UserNode {
     pub fn to_context(&self) -> String {
         format!("User: {}", self.user_id)
     }

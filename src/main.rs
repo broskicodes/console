@@ -1,5 +1,5 @@
 use actix_web::web::{self, ServiceConfig};
-use actix_web::middleware::Logger;
+use actix_web::middleware::{from_fn, Logger};
 use async_openai::config::OpenAIConfig;
 use async_openai::Client;
 use neo4rs::{ConfigBuilder, Graph};
@@ -9,6 +9,7 @@ use sqlx::PgPool;
 use tracing_actix_web::TracingLogger;
 use utils::config::{AppEnv, AppState};
 
+pub mod middleware;
 pub mod routes;
 pub mod types;
 pub mod model;
@@ -54,8 +55,9 @@ async fn actix_web(
                     .service(routes::ai::create_knowledge_graph)
                     .service(routes::ai::search_knowledge_graph)
                 )
-                .wrap(Logger::default())
+                .wrap(from_fn(middleware::auth::authenticate_user))
                 .wrap(TracingLogger::default())
+                .wrap(Logger::default())
                 .app_data(app_state)
                 .app_data(app_env)
         );

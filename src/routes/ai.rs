@@ -1,18 +1,17 @@
-use std::str::FromStr;
-
 use actix_web::{post, web, Error};
 use async_openai::types::{ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionResponseMessage, CreateChatCompletionRequestArgs};
 use chrono::Local;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{model::{Chat, Message}, types::{ChatPrompts, SendMessageRequest}, utils::graph::create_knowledge_from_chat, AppState};
+use crate::{middleware::auth::AuthenticatedUser, model::{Chat, Message}, types::{ChatPrompts, SendMessageRequest}, utils::graph::create_knowledge_from_chat, AppState};
 use crate::utils::config::{Parsable, Convinience};
 
 #[post("/send-message")]
 async fn send_message(
     app_state: web::Data<AppState>,
-    req_body: web::Json<SendMessageRequest>
+    req_body: web::Json<SendMessageRequest>,
+    user: AuthenticatedUser
 ) -> Result<web::Json<ChatCompletionResponseMessage>, Error> {
     let body = req_body.into_inner();
     let chat_id = body.chat_id.clone();
@@ -38,7 +37,7 @@ async fn send_message(
                 .await
                 .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
 
-            let context = app_state.graph.semantic_search("user", embedding, threshold)
+            let context = app_state.graph.semantic_search(&user.user_id, embedding, threshold)
                 .await
                 .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?
                 .to_context()
@@ -69,7 +68,7 @@ async fn send_message(
 
     match existing_chat {
         None => {
-            Chat::new(&app_state.pool, Some(chat_id.clone()), flavour.clone())
+            Chat::new(&app_state.pool, Some(chat_id.clone()), user.user_id.clone(), flavour.clone())
                 .await
                 .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
 
@@ -124,7 +123,7 @@ async fn send_message(
                 let app_state = app_state.clone();
 
                 tokio::spawn(async move {
-                    let _ = create_knowledge_from_chat(app_state.into_inner(), chat_id);
+                    let _ = create_knowledge_from_chat(app_state.into_inner(), user.user_id.clone(), chat_id);
                 });
             }
             _ => {}
@@ -141,11 +140,13 @@ async fn send_message(
 #[post("/create-knowledge-graph")]
 async fn create_knowledge_graph(
     app_state: web::Data<AppState>,
+    user: AuthenticatedUser
 ) -> Result<web::Json<String>, Error> {
-    let chat_id = Uuid::from_str("004a7905-f15f-4ddb-be83-6958cd4a3fa8")
+    // let chat_id = Uuid::from_str("004a7905-f15f-4ddb-be83-6958cd4a3fa8")
+    let chat_id = Uuid::try_parse("91550d27-87ca-4005-9580-03ab2ef4edf5")
         .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
 
-    let schema = create_knowledge_from_chat(app_state.into_inner(), chat_id)
+    let schema = create_knowledge_from_chat(app_state.into_inner(), user.user_id.clone(), chat_id)
         .await
         .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
 
@@ -155,13 +156,14 @@ async fn create_knowledge_graph(
 #[post("/search-graph")]
 async fn search_knowledge_graph(
     app_state: web::Data<AppState>,
+    user: AuthenticatedUser,
     // req_body: web::Json<SearchGraphRequest>
 ) -> Result<web::Json<String>, Error> {
     let embedding = app_state.openai_client.get_embedding(String::from("What are my goals?"))
         .await
         .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
 
-    let graph = app_state.graph.semantic_search("user", embedding, 0.1)
+    let graph = app_state.graph.semantic_search(&user.user_id, embedding, 0.1)
         .await
         .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
 

@@ -78,7 +78,7 @@ impl Message {
             r#"
             SELECT id, chat_id, role, content, created_at, updated_at, deleted_at 
             FROM messages 
-            WHERE chat_id = $1 AND deleted_at IS NULL
+            WHERE chat_id = $1 AND deleted_at IS NULL AND role != 'system'
             ORDER BY created_at ASC
             "#,
             chat_id

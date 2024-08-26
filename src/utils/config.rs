@@ -6,6 +6,7 @@ use serde::Deserialize;
 use shuttle_runtime::SecretStore;
 use sqlx::PgPool;
 use tracing::info;
+use uuid::Uuid;
 
 use crate::model::{Neo4jGraph, Neo4jNode, Neo4jRelation};
 
@@ -47,7 +48,8 @@ pub trait Parsable {
     fn run_queries(&self, queries: Vec<String>) -> impl Future<Output = Result<(), Error>>;
     fn parse_query_result(&self, query: Query) -> impl Future<Output = Result<Neo4jGraph, Error>>;
     fn semantic_search(
-        &self, user_id: &str, 
+        &self, 
+        user_id: &Uuid, 
         search_query_embedding: Vec<f32>, 
         threshold: f32
     ) -> impl Future<Output = Result<Neo4jGraph, Error>>;
@@ -108,7 +110,7 @@ impl Parsable for Graph {
         })
     }
 
-    async fn semantic_search(&self, user_id: &str, search_query_embedding: Vec<f32>, threshold: f32) -> Result<Neo4jGraph, Error> {
+    async fn semantic_search(&self, user_id: &Uuid, search_query_embedding: Vec<f32>, threshold: f32) -> Result<Neo4jGraph, Error> {
         let graph_query = query(
             r#"
             MATCH (u:User {user_id: $user_id})
@@ -129,7 +131,7 @@ impl Parsable for Graph {
     
         let graph = self.parse_query_result(
             graph_query
-                .param("user_id", user_id)
+                .param("user_id", user_id.to_string())
                 .param("embedding", search_query_embedding)
                 .param("threshold", threshold)
         )
