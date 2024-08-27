@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use async_openai::{config::OpenAIConfig, Client};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::utils::config::Convinience;
 
@@ -36,11 +37,12 @@ pub struct GraphData {
 impl GraphData {
     pub async fn into_queries(
         self,
+        user_id: &Uuid,
         openai_client: &Client<OpenAIConfig>,
     ) -> Result<CypherQueries, anyhow::Error> {
+        let mut node_id_map: HashMap<String, String> = HashMap::new();
         let mut node_queries: Vec<String> = vec![];
-
-        for node in self.nodes {
+        for mut node in self.nodes {
             let embedding_content: Option<String> = match node.label.as_str() {
                 "Interest" => {
                     let name = node
@@ -105,6 +107,17 @@ impl GraphData {
                 _ => None,
             };
 
+            if node.label == "User" {
+                node.properties.insert(
+                    "user_id".to_string(),
+                    serde_json::json!(user_id.to_string()),
+                );
+            }
+
+            // Gross hack
+            let new_id = Uuid::new_v4().to_string();
+            node_id_map.insert(node.id.clone(), new_id.clone());
+
             if let Some(embedding_content) = embedding_content {
                 let embedding = openai_client.get_embedding(embedding_content).await?;
 
@@ -112,7 +125,7 @@ impl GraphData {
                     "CREATE ({}:{} {{ id: \"{}\", embedding: {:?}, {} }})",
                     node.id,
                     node.label,
-                    node.id,
+                    new_id.clone(),
                     embedding,
                     node.properties
                         .into_iter()
@@ -125,7 +138,7 @@ impl GraphData {
                     "CREATE ({}:{} {{ id: \"{}\", {} }})",
                     node.id,
                     node.label,
-                    node.id,
+                    new_id.clone(),
                     node.properties
                         .into_iter()
                         .map(|(k, v)| format!("{}: {}", k, v))
@@ -141,11 +154,13 @@ impl GraphData {
             .map(|rel| {
                 format!(
                     r#"
-                MATCH (n), (m)
-                WHERE n.id = "{}" AND m.id = "{}"
-                CREATE (n)-[:{}]->(m)
-                "#,
-                    rel.source_id, rel.target_id, rel.label
+                    MATCH (n), (m)
+                    WHERE n.id = "{}" AND m.id = "{}"
+                    CREATE (n)-[:{}]->(m)
+                    "#,
+                    node_id_map.get(&rel.source_id).unwrap_or(&rel.source_id),
+                    node_id_map.get(&rel.target_id).unwrap_or(&rel.target_id),
+                    rel.label
                 )
             })
             .collect::<Vec<String>>();

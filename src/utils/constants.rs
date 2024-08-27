@@ -230,12 +230,7 @@ pub const GRAPH_SCHEMA: &str = r##"{
       {
         "id_format": "user_{num}",
         "label": "User",
-        "properties": {
-          "user_id": {
-            "nullable": false,
-            "type": "string"
-          }
-        }
+        "properties": {}
       },
       {
         "id_format": "interest_{num}",

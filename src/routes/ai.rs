@@ -1,3 +1,4 @@
+use actix_web::error::ErrorInternalServerError;
 use actix_web::{post, web, Error};
 use async_openai::types::{
     ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs,
@@ -37,9 +38,7 @@ async fn send_message(
                     let (_, content) = app_state
                         .openai_client
                         .get_data_from_message_request(message.clone())
-                        .map_err(|e| {
-                            Error::from(actix_web::error::ErrorInternalServerError(e.to_string()))
-                        })?;
+                        .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
 
                     (content, 0.4)
                 }
@@ -50,21 +49,15 @@ async fn send_message(
                 .openai_client
                 .get_embedding(embedding_content)
                 .await
-                .map_err(|e| {
-                    Error::from(actix_web::error::ErrorInternalServerError(e.to_string()))
-                })?;
+                .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
 
             let context = app_state
                 .graph
                 .semantic_search(&user.user_id, embedding, threshold)
                 .await
-                .map_err(|e| {
-                    Error::from(actix_web::error::ErrorInternalServerError(e.to_string()))
-                })?
+                .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?
                 .to_context()
-                .map_err(|e| {
-                    Error::from(actix_web::error::ErrorInternalServerError(e.to_string()))
-                })?;
+                .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
 
             &ChatPrompts::DailyOutline
                 .prompt_template()
@@ -80,16 +73,14 @@ async fn send_message(
             ChatCompletionRequestSystemMessageArgs::default()
                 .content(chat_sys_prompt)
                 .build()
-                .map_err(|e| {
-                    Error::from(actix_web::error::ErrorInternalServerError(e.to_string()))
-                })?,
+                .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?,
         )];
 
     messages.extend(body.messages.clone().iter().cloned());
 
     let existing_chat = Chat::get(&app_state.pool, chat_id.clone())
         .await
-        .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+        .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
 
     match existing_chat {
         None => {
@@ -100,7 +91,7 @@ async fn send_message(
                 flavour.clone(),
             )
             .await
-            .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+            .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
 
             Message::new(
                 &app_state.pool,
@@ -109,7 +100,7 @@ async fn send_message(
                 chat_sys_prompt.to_string(),
             )
             .await
-            .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+            .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
         }
         _ => {}
     };
@@ -119,9 +110,7 @@ async fn send_message(
             let (role, content) = app_state
                 .openai_client
                 .get_data_from_message_request(message.clone())
-                .map_err(|e| {
-                    Error::from(actix_web::error::ErrorInternalServerError(e.to_string()))
-                })?;
+                .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
 
             Message::new_with_embedding(
                 &app_state.pool,
@@ -131,7 +120,7 @@ async fn send_message(
                 content,
             )
             .await
-            .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+            .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
         }
         None => {}
     }
@@ -142,22 +131,26 @@ async fn send_message(
         .model(model)
         .messages(messages)
         .build()
-        .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+        .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
 
     let response = client
         .chat()
         .create(request)
         .await
-        .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+        .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
 
     let response_message = response.choices[0].message.clone();
-    let response_content = response_message.clone().content.ok_or(Error::from(
-        actix_web::error::ErrorInternalServerError(String::from("No content in AI response")),
-    ))?;
+    let response_content =
+        response_message
+            .clone()
+            .content
+            .ok_or(Error::from(ErrorInternalServerError(String::from(
+                "No content in AI response",
+            ))))?;
 
     let final_message: Option<String> =
         regex::Regex::new(r"<final_message>((?s).*?)</final_message>")
-            .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?
+            .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?
             .captures(&response_content)
             .map(|cap| Some(cap.get(1).unwrap().as_str().to_string()))
             .unwrap_or(None);
@@ -190,7 +183,7 @@ async fn send_message(
         response_content,
     )
     .await
-    .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+    .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
 
     Ok(web::Json(response_message))
 }
@@ -200,13 +193,13 @@ async fn create_knowledge_graph(
     app_state: web::Data<AppState>,
     user: AuthenticatedUser,
 ) -> Result<web::Json<String>, Error> {
-    // let chat_id = Uuid::from_str("004a7905-f15f-4ddb-be83-6958cd4a3fa8")
+    // let chat_id = Uuid::try_parse("004a7905-f15f-4ddb-be83-6958cd4a3fa8")
     let chat_id = Uuid::try_parse("91550d27-87ca-4005-9580-03ab2ef4edf5")
-        .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+        .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
 
     let schema = create_knowledge_from_chat(app_state.into_inner(), user.user_id.clone(), chat_id)
         .await
-        .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+        .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
 
     Ok(web::Json(schema))
 }
@@ -221,16 +214,16 @@ async fn search_knowledge_graph(
         .openai_client
         .get_embedding(String::from("What are my goals?"))
         .await
-        .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+        .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
 
     let graph = app_state
         .graph
-        .semantic_search(&user.user_id, embedding, 0.1)
+        .semantic_search(&user.user_id, embedding, 0.3)
         .await
-        .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+        .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
 
     let context = graph
         .to_context()
-        .map_err(|e| Error::from(actix_web::error::ErrorInternalServerError(e.to_string())))?;
+        .map_err(|e| Error::from(ErrorInternalServerError(e.to_string())))?;
     Ok(web::Json(context))
 }

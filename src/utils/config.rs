@@ -6,7 +6,9 @@ use std::{
 use async_openai::{
     config::OpenAIConfig,
     types::{
-        ChatCompletionRequestMessage, ChatCompletionRequestUserMessageContent,
+        ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs,
+        ChatCompletionRequestUserMessageContent, ChatCompletionResponseFormat,
+        ChatCompletionResponseFormatType, CreateChatCompletionRequestArgs,
         CreateEmbeddingRequestArgs,
     },
     Client,
@@ -63,6 +65,7 @@ pub trait Parsable {
         search_query_embedding: Vec<f32>,
         threshold: f32,
     ) -> impl Future<Output = Result<Neo4jGraph, Error>>;
+    fn get_full_graph(&self, user_id: &Uuid) -> impl Future<Output = Result<Neo4jGraph, Error>>;
 }
 
 impl Parsable for Graph {
@@ -75,6 +78,54 @@ impl Parsable for Graph {
         txn.commit().await?;
 
         Ok(())
+    }
+
+    async fn get_full_graph(&self, user_id: &Uuid) -> Result<Neo4jGraph, Error> {
+        let graph_query = query(
+            r#"
+            MATCH (:User {user_id: $user_id})-[*]-(n)
+            WITH n
+            MATCH (n)-[r]-(m)
+            RETURN DISTINCT n, r as rel, m
+            "#,
+        )
+        .param("user_id", user_id.to_string());
+
+        let graph = self.parse_query_result(graph_query).await?;
+
+        Ok(graph)
+    }
+
+    async fn semantic_search(
+        &self,
+        user_id: &Uuid,
+        search_query_embedding: Vec<f32>,
+        threshold: f32,
+    ) -> Result<Neo4jGraph, Error> {
+        let graph_query = query(
+            r#"
+            MATCH (u:User {user_id: $user_id})
+            MATCH (u)-[*]-(n)
+            WHERE n.embedding IS NOT NULL
+            WITH n, n.embedding as vec1, $embedding as vec2
+            WITH n, vec1, vec2,
+                reduce(dot = 0.0, i IN range(0, size(vec1)-1) | dot + vec1[i] * vec2[i]) AS dotProduct,
+                sqrt(reduce(norm1 = 0.0, i IN range(0, size(vec1)-1) | norm1 + vec1[i] * vec1[i])) AS norm1,
+                sqrt(reduce(norm2 = 0.0, i IN range(0, size(vec2)-1) | norm2 + vec2[i] * vec2[i])) AS norm2
+            WITH n, dotProduct / (norm1 * norm2) AS score
+            WHERE score > $threshold
+            MATCH (n)-[r]-(m)
+            RETURN DISTINCT n, r as rel, m, score
+            ORDER BY score DESC
+            "#,
+        )
+        .param("user_id", user_id.to_string())
+        .param("embedding", search_query_embedding)
+        .param("threshold", threshold);
+
+        let graph = self.parse_query_result(graph_query).await?;
+
+        Ok(graph)
     }
 
     async fn parse_query_result(&self, query: Query) -> Result<Neo4jGraph, Error> {
@@ -126,42 +177,6 @@ impl Parsable for Graph {
             relations: relations.into_iter().collect(),
         })
     }
-
-    async fn semantic_search(
-        &self,
-        user_id: &Uuid,
-        search_query_embedding: Vec<f32>,
-        threshold: f32,
-    ) -> Result<Neo4jGraph, Error> {
-        let graph_query = query(
-            r#"
-            MATCH (u:User {user_id: $user_id})
-            MATCH (u)-[*]-(n)
-            WHERE n.embedding IS NOT NULL
-            WITH n, n.embedding as vec1, $embedding as vec2
-            WITH n, vec1, vec2,
-                reduce(dot = 0.0, i IN range(0, size(vec1)-1) | dot + vec1[i] * vec2[i]) AS dotProduct,
-                sqrt(reduce(norm1 = 0.0, i IN range(0, size(vec1)-1) | norm1 + vec1[i] * vec1[i])) AS norm1,
-                sqrt(reduce(norm2 = 0.0, i IN range(0, size(vec2)-1) | norm2 + vec2[i] * vec2[i])) AS norm2
-            WITH n, dotProduct / (norm1 * norm2) AS score
-            WHERE score > $threshold
-            MATCH (n)-[r]-(m)
-            RETURN DISTINCT n, r as rel, m, score
-            ORDER BY score DESC
-            "#,
-        );
-
-        let graph = self
-            .parse_query_result(
-                graph_query
-                    .param("user_id", user_id.to_string())
-                    .param("embedding", search_query_embedding)
-                    .param("threshold", threshold),
-            )
-            .await?;
-
-        Ok(graph)
-    }
 }
 
 pub trait Convinience {
@@ -169,6 +184,10 @@ pub trait Convinience {
         &self,
         content: String,
     ) -> impl Future<Output = Result<Vec<f32>, anyhow::Error>>;
+    fn get_tool_response(
+        &self,
+        prompt: String,
+    ) -> impl Future<Output = Result<String, anyhow::Error>>;
     fn get_data_from_message_request(
         &self,
         message: ChatCompletionRequestMessage,
@@ -194,6 +213,29 @@ impl Convinience for Client<OpenAIConfig> {
             .clone();
 
         Ok(embedding)
+    }
+
+    async fn get_tool_response(&self, prompt: String) -> Result<String, anyhow::Error> {
+        let request = CreateChatCompletionRequestArgs::default()
+            .model("gpt-4o")
+            .response_format(ChatCompletionResponseFormat {
+                r#type: ChatCompletionResponseFormatType::JsonObject,
+            })
+            .messages(vec![ChatCompletionRequestMessage::System(
+                ChatCompletionRequestSystemMessageArgs::default()
+                    .content(prompt)
+                    .build()?,
+            )])
+            .build()?;
+
+        let response = self.chat().create(request).await?;
+        let content = response.choices[0]
+            .message
+            .content
+            .clone()
+            .ok_or(anyhow::anyhow!("No content in AI response"))?;
+
+        Ok(content)
     }
 
     fn get_data_from_message_request(

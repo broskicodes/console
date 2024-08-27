@@ -50,6 +50,9 @@ pub enum ToolPrompts {
     #[serde(rename = "extract_entities")]
     #[sqlx(rename = "extract_entities")]
     ExtractEntities,
+    #[serde(rename = "merge_graph")]
+    #[sqlx(rename = "merge_graph")]
+    MergeGraph,
 }
 
 impl ToolPrompts {
@@ -79,13 +82,30 @@ impl ToolPrompts {
                 "<graph_data>\n",
                 "{graph_data}\n",
                 "</graph_data>\n",
-                "Today is {date}. The user's ID is {user_id}.\n",
+                "Today is {date}.\n",
                 "Your name is Buddy. You are an expert at parsing text to extract entities for a Neo4J knowledge graph.\n",
                 "The text to be parsed is provided to you above in <interview></interview> tags. It contains a conversation between a user and an AI companion where the user shares information about their interests, motivations, and goals.\n",
                 "The schema for the knowledge graph is also provided to you above in <graph_schema></graph_schema> tags. This schema defines the entities and relationships that will be used to represent the user's information in the knowledge graph.\n",
                 "Your task is to extract instances of these entities and relationships from the interview text. You will use the graph schema to inform the types of entities and relationships you can extract.\n",
                 "You will output a JSON object that conforms to the JSON schema in <graph_data></graph_data> tags.\n",
                 "Your output must be a valid JSON object!"
+            ),
+            ToolPrompts::MergeGraph => concat!(
+                "<graph_schema>\n",
+                "{graph_schema}\n",
+                "</graph_schema>\n",
+                "<existing_graph>\n",
+                "{existing_graph}\n",
+                "</existing_graph>\n",
+                "<new_graph>\n",
+                "{new_graph}\n",
+                "</new_graph>\n",
+                "Today is {date}.\n",
+                "Your name is Buddy. You are an expert at merging data from two knowledge graphs into a single graph.\n",
+                "You have been provided with two knowledge graphs for the same user. The existing knowledge graph can be found in <existing_graph></existing_graph> tags. The new knowledge graph can be found in <new_graph></new_graph> tags.\n",
+                "Both graphs adhere to the schema provided to you above in <graph_schema></graph_schema> tags. This schema defines the entities and relationships that are used to represent data in the knowledge graph.\n",
+                "Your task is to extend the existing graph with data from the new graph. You will output a JSON object containing a list of nodes and a list of relationships that will be added to the existing graph. You should only output data that is not already included in the existing graph.\n",
+                "Your response must be a valid JSON object that follows the same format as the provided graphs!"
             ),
         }
     }
