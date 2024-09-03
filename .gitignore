@@ -1,4 +1,6 @@
 /target
-Secrets.toml
+Secrets*.toml
 .env
 temp.txt
+.shuttle-storage
+.DS_Store
